@@ -12,6 +12,21 @@ function chooseEnemyDirection()
     enemy.dy = math.sin(angle)
 end
 
+-- Function to play a random dialogue
+function playRandomBossDialogue()
+    call_count = call_count + 1
+
+    -- Only play sound randomly 1 out of 5 times
+    if call_count >= 15 then
+        -- Reset counter
+        call_count = 0
+
+        -- Pick a random sound
+        local index = love.math.random(#boss_dialogues)
+        boss_dialogues[index]:play()
+    end
+end
+
 -- Respawn enemy from a random side of the screen
 function respawnEnemy()
     local side = math.random(4)
@@ -31,6 +46,7 @@ function respawnEnemy()
     end
 
     chooseEnemyDirection()
+    playRandomBossDialogue()
 end
 
 
@@ -48,6 +64,37 @@ function love.load()
     background = love.graphics.newImage("assets/background.png")
     shoot_sound = love.audio.newSource("assets/shoot.wav", "static")
     reload_sound = love.audio.newSource("assets/reload.wav", "static")
+
+    -- Boss Dialogues
+    boss_dialogue_1 = love.audio.newSource("assets/you_suck.wav", "static")
+    boss_dialogue_2 = love.audio.newSource("assets/go_back_to_work.wav", "static")
+    boss_dialogue_3 = love.audio.newSource("assets/Im_the_boss.wav", "static")
+    boss_dialogue_4 = love.audio.newSource("assets/no_salary_hike.wav", "static")
+
+    boss_dialogues = {
+	love.audio.newSource("assets/you_suck.wav", "static"),
+	love.audio.newSource("assets/go_back_to_work.wav", "static"),
+	love.audio.newSource("assets/Im_the_boss.wav", "static"),
+	love.audio.newSource("assets/no_salary_hike.wav", "static")
+    }
+    call_count = 0
+
+
+    -- Particle System
+    particleImage = love.graphics.newImage("assets/particle.png") -- small red droplet image
+    psystem = love.graphics.newParticleSystem(particleImage, 100)
+    psystem_x = 0
+    psystem_y = 0
+
+    psystem:setParticleLifetime(0.2, 0.5)  -- particles live shortly
+    psystem:setLinearAcceleration(-500, -500, 500, 500) -- scatter in all directions
+    psystem:setSpeed(300, 500) -- initial speed range
+    psystem:setSpread(math.rad(360)) -- full circle burst
+    psystem:setSizes(1, 1) -- no shrinking
+    psystem:setRotation(0, math.pi * 2) -- random rotation
+    psystem:setSpin(0, 2) -- optional spin
+    psystem:setColors(1, 0, 0, 1, 1, 0, 0, 0) -- fade to transparent
+    psystem:setEmissionRate(0) -- no continuous emission
 
     -- Player setup
     player = {
@@ -126,6 +173,8 @@ function love.update(dt)
 	    player.y = 0
 	end
 
+	-- update particle
+	psystem:update(dt)
 
 	-- Move enemy
 	enemy.x = enemy.x + enemy.dx * enemy.speed * dt
@@ -149,14 +198,15 @@ function love.update(dt)
 	-- Collision check (kill enemy)
 	if CheckCollision(player.x, player.y, player.w, player.h,
 			  enemy.x, enemy.y, enemy.w, enemy.h) and kill and player.bullet > 0 then
-	    respawnEnemy()
+	    psystem_x = enemy.x
+	    psystem_y = enemy.y
 	    score = score + 1
-	    -- win = true
-	    -- player.canMove = false
+	    psystem:emit(30) -- burst of droplets
+	    respawnEnemy()
 	end	
     end
 
-    if game_state == 'stop' and love.keyboard.isDown('return') then
+    if game_state == 'stop' and love.keyboard.isDown('space') then
 	reload_sound:play()
 	game_state = 'playing'
 	score = 0
@@ -164,7 +214,7 @@ function love.update(dt)
 	player.bullet = 60
     end
 
-    if game_state == 'starting' and love.keyboard.isDown('return') then
+    if game_state == 'starting' and love.keyboard.isDown('space') then
 	reload_sound:play()
 	game_state = 'playing'
     end
@@ -188,15 +238,18 @@ function love.draw()
     -- Draw enemy if not dead
     if game_state == 'playing' then
 	love.graphics.draw(enemy.sprite, enemy.x, enemy.y)
+	love.graphics.draw(psystem, psystem_x, psystem_y)
     end
 
     if game_state == 'stop' then
-	 love.graphics.print("Press Enter To Restart!", screenW / 4, screenH / 2, 0, 3, 3)
+	love.graphics.print("Press Space To Restart!", (screenW / 2) - 150, screenH / 2.5, 0, 2, 2)
     end
 
     if game_state == 'starting' then
-	love.graphics.draw(enemy.sprite, screenW/2.4, screenH/3, 0, 3, 3)
-	love.graphics.print("Press Enter To Play!", screenW / 3.6, screenH / 2, 0, 3, 3)
+	-- love.graphics.draw(enemy.sprite, screenW/2.4, screenH/3, 0, 3, 3)
+	love.graphics.print("Lights Gone Kill The Boss!", (screenW / 2) - 150, screenH / 2.5, 0, 2, 2)
+	love.graphics.print("Press Space To Play!", (screenW / 2) - 60, screenH / 2.2)
+	
     end
     
 
